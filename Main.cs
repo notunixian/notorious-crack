@@ -45,7 +45,6 @@ namespace cracktool
         {
             Instance.Patch(typeof(System.Net.WebClient).GetMethod(nameof(System.Net.WebClient.UploadValues), new Type[] { typeof(string), typeof(NameValueCollection) }),
                 new HarmonyLib.HarmonyMethod(typeof(cracktool), "UploadPatch"));
-            Instance.Patch(typeof(System.Diagnostics.Process).GetMethod(nameof(System.Diagnostics.Process.Kill)), new HarmonyLib.HarmonyMethod(typeof(cracktool), "ReturnFalse"));
         }
 
         public void r2f(string resourceName, string fileName)
@@ -62,6 +61,9 @@ namespace cracktool
         public override void
             OnApplicationEarlyStart() // Runs after Game Initialization, before OnApplicationStart and (on Il2Cpp games) before Unhollower.
         {
+            // simple rundown of how notorious does some checks
+
+            // step 1: notorious checks if you have 2 things: the notorious folder in your appdata and the auth.gg (contains your key) in that folder
             if (!Directory.Exists($"{Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)}\\Notorious"))
             {
                 Directory.CreateDirectory($"{Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)}\\Notorious");
@@ -75,12 +77,16 @@ namespace cracktool
                 MelonLogger.Msg(ConsoleColor.Blue, "created auth file and filled with garbage data");
             }
 
+            // step 2: notorious split their dependencies into a seperate dll and looks for it when it's running, without it you won't have the proper resources.
+            // no idea if notorious actually checks if the loader is loaded into the program or not, but we do it for safe measure :)
             MelonLogger.Msg(ConsoleColor.Blue, "copying resources to userdata");
             r2f("cracktool.n-dependencies.dll", MelonUtils.UserDataDirectory + "\\n-dependencies.dll");
             r2f("cracktool.n-dummy.dll", MelonUtils.UserDataDirectory + "\\n-dummy.dll");
             r2f("cracktool.n.dll", MelonUtils.UserDataDirectory + "\\n.dll");
             r2f("cracktool.payload.txt", MelonUtils.UserDataDirectory + "\\payload.txt");
 
+            // step 3: the notorious core dll is actually a melonloader mod, meaning that it won't work with conventional means of just invoking OnApplicationStart as if it was a static method
+            // melonloader gives us the ability to load a mod from an assembly, so we just do this.
             Assembly asm = Assembly.LoadFrom(MelonUtils.UserDataDirectory + "\\n.dll");
             MelonHandler.LoadFromAssembly(asm, MelonUtils.UserDataDirectory + "\\n.dll");
             Assembly.LoadFrom(MelonUtils.UserDataDirectory + "\\n-dependencies.dll");
@@ -88,18 +94,27 @@ namespace cracktool
             MelonLogger.Msg(ConsoleColor.Blue, "loading assemblies...");
             MelonLogger.Msg(ConsoleColor.Green, "successfully loaded all assemblies (main, dummy, dependencies)");
 
+            // here is where the magic comes in.
+            // if you don't have a basic understanding of reflection, decide to read up on it as it's pretty interesting.
+
+            // GetTypes gets all the types within our Notorious core assembly, allowing us to see all the types that are inside of the assembly.
             Type[] types = asm.GetTypes();
             foreach (Type type in types)
             {
+                // foreaching through these types allows us to step through each type one at a time
+                // we do this metadatatoken search because of notorious's naming convenction on types not being the most friendly
                 if (type.MetadataToken != 0x020003C0)
                 {
                     continue;
                 }
+
+                // once we find the proper type, we can find all the methods (u can also call them functions) inside of the type, this gives us a lot of power.
                 try
                 {
                     MethodInfo[] methods = type.GetMethods(BindingFlags.NonPublic | BindingFlags.Static);
                     foreach (MethodInfo methodInfo in methods)
                     {
+                        // the method in this instance is HUDMessage, which shows the little "Welcome to Notorious" message. seemed kind of funny to patch so i did it.
                         if (methodInfo.Name == "HUDMessage")
                         {
                             Instance.Patch(methodInfo,
@@ -114,6 +129,7 @@ namespace cracktool
                 }
             }
 
+            // same principle here
             foreach (Type type in types)
             {
                 if (type.MetadataToken != 0x020004F2)
@@ -125,6 +141,7 @@ namespace cracktool
                     MethodInfo[] methods = type.GetMethods(BindingFlags.NonPublic | BindingFlags.Static);
                     foreach (MethodInfo methodInfo in methods)
                     {
+                        // this is one of the auth checks inside of notorious, due to no really preliminary checks to see if this ever gets ran/set we can just make this not run.
                         if (methodInfo.Name == "Setup")
                         {
                             Instance.Patch(methodInfo,
@@ -132,6 +149,7 @@ namespace cracktool
                             MelonLogger.Msg(ConsoleColor.Blue, "patched Setup");
                         }
 
+                        // this is also another one of the auth checks inside of notorious, once again due to no really preliminary checks to see if it ever gets ran/set we can make it not run.
                         if (methodInfo.Name == "RCT")
                         {
                             Instance.Patch(methodInfo,
@@ -146,6 +164,7 @@ namespace cracktool
                 }
             }
 
+            // we are done!
             MelonLogger.Msg(ConsoleColor.Green, "finished. client will load when OnApplicationStart is hit");
 
             // not needed sleep here, just so user can read stuff that was printed ig
@@ -155,10 +174,18 @@ namespace cracktool
 
         public static bool UploadPatch(ref byte[] __result, ref string address, ref NameValueCollection data)
         {
+            // this is retrived from Meap's cloudflare list on his github.
             string[] addresses = { "104.26.8", "172.67.70", "104.26.9", "172.67.172", "104.22.42", "104.16.133" };
             if (addresses.Contains(address) == true)
             {
                 MelonLogger.Msg(ConsoleColor.Blue, "redirecting call to UploadValues");
+
+                // when you make a request to meap's servers, it returns a couple of things:
+                // your key,
+                // your avatar favorites,
+                // all the nametags (userids are encrypted, don't ask me to decrypt)
+                // your settings for notorious
+                // some more
                 __result = Encoding.UTF8.GetBytes($"{File.ReadAllText($"{MelonUtils.UserDataDirectory}\\payload.txt")}");
                 return false;
             }
@@ -167,6 +194,7 @@ namespace cracktool
 
         public static bool RewritePatch(ref string Message, ref bool ForceMessage)
         {
+            // funny patch to say notorious cracked by unixian ig
             if (Message.Contains("<color=#D781E7>Notorious</color>"))
             {
                 Message = "<color=#D781E7>Notorious</color> cracked by <color=#00FF00>Unixian</color>, enjoy!";
@@ -176,6 +204,7 @@ namespace cracktool
 
         public static bool ReturnFalse()
         {
+            // patch to just make something not run cause harmony is cool
             return false;
         }
     }
