@@ -2,7 +2,7 @@
 Due to the release of EAC on VRChat across everywhere, I decided to provide one of the only cracks I kept private/to myself. I don't dislike Meap or Unreal at all, both are extremely nice people and deserve all the praise for what they have done for the VRC client community. Have fun while this lasts, at some point you'll update your game and this crack won't work anymore. It was fun while it lasted I guess.
 
 # Warning ⚠
-This crack is simply a proof of concept, your settings won't save as I won't take the time to make it replicate to the payload each and every single time you change your settings. You are free to add on this to make it do this, but it is basically useless due to EAC being implemented and you not being able to create new instances.
+This crack is simply a proof of concept, your settings won't save as I won't take the time to make it replicate to the payload each and every single time you change your settings. You are free to add on this to make it do this, but it is basically useless due to EAC being implemented and you not being able to create new instances. Some required files that I might of forgotten are also not here, so this might not work for you in the first place.
 
 # Instructions
 1. Insert this plugin (yes, plugin) into your plugins folder inside of your VRChat folder.
